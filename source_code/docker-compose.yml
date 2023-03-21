@@ -1,0 +1,180 @@
+version: "3.8"
+
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    hostname: namenode
+    ports:
+      - 9870:9870
+      - 9000:9000
+    environment:
+      - CLUSTER_NAME=stock
+    env_file:
+      - ./hadoop/hadoop.env
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - ../storage/hadoop/namenode:/hadoop/dfs/name
+    networks:
+      - es-net
+
+  datanode-1:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode-1
+    hostname: datanode-1
+    ports:
+      - 9864:9864
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hadoop/hadoop.env
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+    volumes:
+    - ../storage/hadoop/datanode-1:/hadoop/dfs/data
+    networks:
+      - es-net
+  datanode-2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode-2
+    hostname: datanode-2
+    ports:
+      - 50075:9864
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hadoop/hadoop.env
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+    volumes:
+    - ../storage/hadoop/datanode-2:/hadoop/dfs/data
+    networks:
+      - es-net
+  datanode-3:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode-3
+    hostname: datanode-3
+    ports:
+      - 29864:9864
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+    env_file:
+      - ./hadoop/hadoop.env
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+    volumes:
+    - ../storage/hadoop/datanode-3:/hadoop/dfs/data
+    networks:
+      - es-net
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864"
+    env_file:
+      - ./hadoop/hadoop.env
+    networks:
+      - es-net
+  nodemanager1:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
+    env_file:
+      - ./hadoop/hadoop.env
+    networks:
+      - es-net
+  
+  # historyserver:
+  #   image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+  #   container_name: historyserver
+  #   restart: always
+  #   environment:
+  #     SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
+  #   volumes:
+  #     - hadoop_historyserver:/hadoop/yarn/timeline
+  #   env_file:
+  #     - ./hadoop/hadoop.env
+  #   networks:
+  #     - es-net
+# cassandra:
+  #   image: cassandra:4.0.5
+  #   container_name: cassandra
+  #   hostname: cassandra
+  #   env_file:
+  #     - ./cassandra/cassandra.env
+  #   ports:
+  #     - 9042:9042
+  #   volumes:
+  #     - ../storage/cassandra:/var/lib/cassandra
+  #   networks:
+  #     - es-net
+  spark-master:
+    image: bde2020/spark-master:3.0.0-hadoop3.2
+    container_name: spark-master
+    depends_on:
+      - namenode
+      - datanode-1
+      - datanode-2
+      - datanode-3
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - INIT_DAEMON_STEP=setup_spark
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    networks:
+      - es-net
+
+  spark-worker:
+    image: bde2020/spark-worker:3.0.0-hadoop3.2
+    container_name: spark-worker
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    environment:
+      - "SPARK_MASTER=spark://spark-master:7077"
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    networks:
+      - es-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.15.1
+    container_name: elasticsearch
+    volumes:
+      - ../storage/esdata:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      - xpack.security.enabled=false
+      - "discovery.type=single-node"
+    networks:
+      - es-net
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.15.1
+    container_name: kibana
+    ports:
+      - 5601:5601
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    networks:
+      - es-net
+networks:
+  es-net:
+    driver: bridge
+
