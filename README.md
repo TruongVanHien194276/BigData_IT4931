@@ -1,6 +1,6 @@
-# IT4931
+# IT4931 - Lưu trữ và xử lý dữ liệu lớn
 # Big data storage and processing
-## Lưu trữ và xử lý, phân tích dữ liệu thông tin tuyển dụng việc làm
+## Topic: Lưu trữ và xử lý, phân tích dữ liệu thông tin tuyển dụng việc làm
 
 ### Luồng dữ liệu của hệ thống gồm 4 quá trình:
 #### 1. Thu thập dữ liệu trên website TopCV.
